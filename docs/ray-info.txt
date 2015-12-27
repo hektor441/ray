@@ -1,0 +1,19 @@
+
+Ray origin:
+    R0 = [x0, y0, z0]
+Ray direction:
+    Rd = [xd, yd, zd]
+Set of points on the ray:
+    R(t) = R0 + t*Rd, t > 0.0
+
+Ray-Sphere Intersection:
+    Sphere center: Sc = [xc, yc, zc]
+    Sphere radius: Sr
+    Sphere:
+        S = {[xs, ys, zs]
+                | (xs - xc)^2 + (ys - yc)^2 + (zs - zc)^2 = Sr^2
+            }
+        
+        P | P^2 = r^2 
+    Replace the xs, ys, zs with R(t)
+        (x0 + xd * t - xc)^2 + (y0 + yd * t - yc)^2 + (z0 + zd * t - zc)^2 = Sr^2
