@@ -52,14 +52,40 @@ public:
 
 
 class Camera {
+public:
   Vector3 origin;
   Vector3 direction;
   Vector3 right;
+  Vector3 up;
   float focus;
   
-public:
   Camera() {
-    
+    origin = Vector3(0);
+    direction = Vector3(0, 0, 1);
+    right = Vector3(1, 0, 0);
+    computeUp();
+    focus = 1.2;
+  }
+  
+  void computeUp() {
+    up = direction.cross(right).normalize();
+  }
+  
+  Ray getRay(int x, int y, int width, int height) {
+    float f = 2/(float) height;
+    float u = (x - width/2.) * f;
+    float v = (height/2. - y) * f;
+    Ray ray(origin, direction.scale(focus) + right.scale(u) + up.scale(v));
+    return ray;
+  }
+  
+  void lookAt(Vector3 target) {
+    direction = (target - origin).normalize();
+    right = Vector3(0, 1, 0).cross(direction).normalize();
+    computeUp();
+  }
+  void lookAt(float x, float y, float z) {
+    lookAt(Vector3(x, y, z));
   }
 };
 
@@ -73,7 +99,7 @@ void closestIntersection(Intersection &itsc, Ray &ray, Scene *scene)
 
 
 
-Vector3 trace(Vector3 &camera, Ray &ray, Scene *scene)
+Vector3 trace(Ray &ray, Scene *scene, int level)
 {
   Intersection itsc;
   // Intersect the ray with every object in the scene,
@@ -94,7 +120,7 @@ Vector3 trace(Vector3 &camera, Ray &ray, Scene *scene)
     Vector3 baseColor = itsc.material->getColor(itsc);
     Vector3 c = baseColor.scale(0.5);
     Vector3 N = itsc.normal.normalize(); // TODO: no need to normalize()
-    Vector3 V = (camera - vt).normalize(); // versor point -> eye
+    Vector3 V = -ray.ray.normalize(); // versor point -> eye
     
     for(int i=0; i < scene->lights.size(); i++) {
       
@@ -125,34 +151,40 @@ Vector3 trace(Vector3 &camera, Ray &ray, Scene *scene)
       c = c + Vector3(255).scale(pow(rv,8.5));
       // if(rv==0) c = c + Vector3(0,0,255);
       
-      c = c +  baseColor.scale(NL*0.4) ;          
+      c = c +  baseColor.scale(NL*0.4) ;
+      
     }
+    
+    if(level<5)
+    {
+      Ray refl(vt, N.scale(2*(V*N)) - V);
+    refl.origin = refl.pointAt(0.002);
+
+      c = c + trace(refl, scene, level + 1).scale(0.4);
+    }
+    
     pixelColor = c.clamp();
   }
   return pixelColor;  
 }
 
-void trace(Vector3 camera, Scene *scene, Image &image, const int aa)
+void trace(Camera &camera, Scene *scene, Image &image)
 {
  
   Vector3 color = Vector3(0);
   Vector3 normal = Vector3(0);
   
-  int w = image.getWidth()*aa;
-  int h = image.getHeight()*aa;
+  int w = image.getWidth()*2;
+  int h = image.getHeight()*2;
   
   for(int iy=0; iy<h; iy++) {
     for(int ix=0; ix<w; ix++) {
+     
+      Ray ray = camera.getRay(ix, iy, w, h);
       
-      
-      float x = ix - w/2;
-      float y = h/2 - iy;
-            
-      Ray ray = Ray(camera, Vector3(x, y, 600*aa));
-      
-      Vector3 pixelColor = trace(camera, ray, scene);
+      Vector3 pixelColor = trace(ray, scene, 0);
   
-      image.add(ix/aa, iy/aa, pixelColor.scale(1./(aa*aa)));
+      image.add(ix/2, iy/2, pixelColor.scale(0.25));
     }
   }
 }
@@ -160,8 +192,8 @@ void trace(Vector3 camera, Scene *scene, Image &image, const int aa)
 
 int main(int argc, char *argv[]) 
 {
-  int width  = 1000;
-  int height = 1000;
+  int width  = 300;
+  int height = 300;
 
   Scene *scene = new Scene();
   Image image(width, height);  
@@ -172,13 +204,23 @@ int main(int argc, char *argv[])
     
   scene->add_light(new Light(Vector3(0, 8, -10), 0.5));
 
+  Camera camera;
+  camera.origin = Vector3(0, 10, -10);
+  camera.lookAt(0, 0, 0);
   
-  for(int k=0; k<1; k++) {
+  int frameCount = 50;
+  
+  for(int k=0; k<frameCount; k++) {
     
-    Vector3 camera = Vector3(0, 0, -15);
-          
+    float phi = 2*M_PI*k/frameCount;
+    float r = 10;
+    camera.origin = Vector3(r*cos(phi),10,r*sin(phi));
+    camera.lookAt(0, 0, 0);
     
-    trace(camera, scene, image, 6);
+    
+
+    
+    trace(camera, scene, image);
     
     // Make multiple files
     char buf[50];
